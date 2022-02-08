@@ -78,7 +78,10 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 					"install",
 				}),
 				"Dir": Equal(workingDir),
-				"Env": ContainElement(fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath)),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+				}),
 			}))
 
 			Expect(executableInvocations[1]).To(MatchFields(IgnoreExtras, Fields{
@@ -86,7 +89,10 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 					"env", "info", "--path",
 				}),
 				"Dir": Equal(workingDir),
-				"Env": ContainElement(fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath)),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+				}),
 			}))
 
 			Expect(venvDir).To(Equal("/some/path/to/some/venv"))

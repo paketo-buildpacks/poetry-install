@@ -39,11 +39,11 @@ func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) 
 
 	env := append(
 		os.Environ(),
-		// fmt.Sprintf("PYTHONUSERBASE=%s", targetPath),
+		fmt.Sprintf("POETRY_CACHE_DIR=%s", cachePath),
 		fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", targetPath),
 	)
 
-	p.logger.Subprocess(fmt.Sprintf("Running 'POETRY_VIRTUALENVS_PATH=%s poetry %s'", targetPath, strings.Join(args, " ")))
+	p.logger.Subprocess(fmt.Sprintf("Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry %s'", cachePath, targetPath, strings.Join(args, " ")))
 
 	buffer := bytes.NewBuffer(nil)
 	err := p.executable.Execute(pexec.Execution{
@@ -57,18 +57,17 @@ func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) 
 		return "", fmt.Errorf("poetry install failed:\n%s\nerror: %w", buffer, err)
 	}
 
-	return p.findVenvDir(workingDir, targetPath)
+	return p.findVenvDir(workingDir, targetPath, cachePath)
 }
 
-func (p PoetryInstallProcess) findVenvDir(workingDir, targetPath string) (string, error) {
+func (p PoetryInstallProcess) findVenvDir(workingDir, targetPath, cachePath string) (string, error) {
 	env := append(
 		os.Environ(),
+		fmt.Sprintf("POETRY_CACHE_DIR=%s", cachePath),
 		fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", targetPath),
 	)
 
 	args := []string{"env", "info", "--path"}
-
-	p.logger.Subprocess(fmt.Sprintf("Running 'POETRY_VIRTUALENVS_PATH=%s poetry %s'", targetPath, strings.Join(args, " ")))
 
 	outBuffer := bytes.NewBuffer(nil)
 	errBuffer := bytes.NewBuffer(nil)

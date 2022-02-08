@@ -73,8 +73,11 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			Expect(logs).To(ContainLines(
 				MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, buildpackInfo.Buildpack.Name)),
 				"  Executing build process",
-				MatchRegexp(fmt.Sprintf("    Running 'POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install'", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				MatchRegexp(fmt.Sprintf("    Running 'POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry env info --path'", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(
+					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install'",
+					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
+					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
+				)),
 				MatchRegexp(`      Completed in \d+\.\d+`),
 			))
 			Expect(logs).To(ContainLines(
