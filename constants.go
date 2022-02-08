@@ -8,10 +8,6 @@ const PoetryVenv = "poetry-venv"
 // buildpack: https://github.com/paketo-buildpacks/cpython.
 const CPython = "cpython"
 
-// Pip is the name of the dependency provided by the Pip buildpack:
-// https://github.com/paketo-buildpacks/pip.
-const Pip = "pip"
-
 // Poetry is the name of the dependency provided by the Poetry buildpack:
 // https://github.com/paketo-buildpacks/poetry.
 const Poetry = "poetry"

@@ -44,12 +44,6 @@ func Detect() packit.DetectFunc {
 						},
 					},
 					{
-						Name: Pip,
-						Metadata: BuildPlanMetadata{
-							Build: true,
-						},
-					},
-					{
 						Name: Poetry,
 						Metadata: BuildPlanMetadata{
 							Build: true,

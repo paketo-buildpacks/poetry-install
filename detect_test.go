@@ -50,12 +50,6 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 						},
 					},
 					{
-						Name: poetryinstall.Pip,
-						Metadata: poetryinstall.BuildPlanMetadata{
-							Build: true,
-						},
-					},
-					{
 						Name: poetryinstall.Poetry,
 						Metadata: poetryinstall.BuildPlanMetadata{
 							Build: true,
