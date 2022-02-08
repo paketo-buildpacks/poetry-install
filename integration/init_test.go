@@ -80,7 +80,6 @@ func TestIntegration(t *testing.T) {
 	Expect(err).NotTo(HaveOccurred())
 
 	settings.Buildpacks.Poetry.Online, err = buildpackStore.Get.
-		WithVersion("1.2.3").
 		Execute(settings.Config.Poetry)
 	Expect(err).NotTo(HaveOccurred())
 
