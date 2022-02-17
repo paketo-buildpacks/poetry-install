@@ -1,0 +1,15 @@
+api = "0.6"
+
+[buildpack]
+  id = "paketo-buildpacks/poetry-install"
+  name = "Paketo Poetry Install Buildpack"
+
+[metadata]
+  include-files = ["bin/run", "bin/build", "bin/detect", "buildpack.toml"]
+  pre-package = "./scripts/build.sh"
+
+[[stacks]]
+  id = "io.buildpacks.stacks.bionic"
+
+[[stacks]]
+  id = "org.cloudfoundry.stacks.cflinuxfs3"
