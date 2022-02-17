@@ -16,7 +16,7 @@ The buildpack will do the following:
   - Configures `poetry` to locate this virtual environment via the
     environment variable `POETRY_VIRTUAL_ENVS_PATH`.
   - Prepends the layer `poetry-venv` onto `PYTHONPATH`.
-  - Prepends the `bin` directory of the  to the `PATH` environment variable.
+  - Prepends the `bin` directory of the `poetry-venv` layer to the `PATH` environment variable.
 * At run time:
   - Does nothing
 
