@@ -70,3 +70,9 @@ To run the unit and integration tests for this buildpack:
 ```
 $ ./scripts/unit.sh && ./scripts/integration.sh
 ```
+
+## Known issues and limitations
+
+* This buildpack will not work in an offline/air-gapped environment: vendoring
+  of dependencies is not supported. This is a limitation of `poetry` - which
+  itself does not support vendoring dependencies.
