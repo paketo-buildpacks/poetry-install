@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/paketo-buildpacks/packit/pexec"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/paketo-buildpacks/packit/v2/pexec"
+	"github.com/paketo-buildpacks/packit/v2/scribe"
 	poetryinstall "github.com/paketo-buildpacks/poetry-install"
 	"github.com/paketo-buildpacks/poetry-install/fakes"
 	"github.com/sclevine/spec"
