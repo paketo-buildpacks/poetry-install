@@ -8,12 +8,14 @@ import (
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/chronos"
 	"github.com/paketo-buildpacks/packit/v2/fs"
+	"github.com/paketo-buildpacks/packit/v2/sbom"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
 )
 
 //go:generate faux --interface EntryResolver --output fakes/entry_resolver.go
 //go:generate faux --interface InstallProcess --output fakes/install_process.go
 //go:generate faux --interface PythonPathLookupProcess --output fakes/python_path_process.go
+//go:generate faux --interface SBOMGenerator --output fakes/sbom_generator.go
 
 // EntryResolver defines the interface for picking the most relevant entry from
 // the Buildpack Plan entries.
@@ -32,12 +34,16 @@ type PythonPathLookupProcess interface {
 	Execute(venvDir string) (string, error)
 }
 
+type SBOMGenerator interface {
+	Generate(dir string) (sbom.SBOM, error)
+}
+
 // Build will return a packit.BuildFunc that will be invoked during the build
 // phase of the buildpack lifecycle.
 //
 // Build will install the poetry dependencies by using the pyproject.toml file
 // to a virtual environment layer.
-func Build(entryResolver EntryResolver, installProcess InstallProcess, pythonPathProcess PythonPathLookupProcess, clock chronos.Clock, logger scribe.Emitter) packit.BuildFunc {
+func Build(entryResolver EntryResolver, installProcess InstallProcess, pythonPathProcess PythonPathLookupProcess, sbomGenerator SBOMGenerator, clock chronos.Clock, logger scribe.Emitter) packit.BuildFunc {
 	return func(context packit.BuildContext) (packit.BuildResult, error) {
 		logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 
@@ -76,6 +82,26 @@ func Build(entryResolver EntryResolver, installProcess InstallProcess, pythonPat
 		venvLayer.Launch, venvLayer.Build = entryResolver.MergeLayerTypes(PoetryVenv, context.Plan.Entries)
 		venvLayer.Cache = venvLayer.Launch || venvLayer.Build
 		cacheLayer.Cache = true
+
+		logger.GeneratingSBOM(venvLayer.Path)
+
+		var sbomContent sbom.SBOM
+		duration, err = clock.Measure(func() error {
+			sbomContent, err = sbomGenerator.Generate(context.WorkingDir)
+			return err
+		})
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+		logger.Action("Completed in %s", duration.Round(time.Millisecond))
+		logger.Break()
+
+		logger.FormattingSBOM(context.BuildpackInfo.SBOMFormats...)
+
+		venvLayer.SBOM, err = sbomContent.InFormats(context.BuildpackInfo.SBOMFormats...)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
 
 		logger.Process("Configuring environment")
 		venvLayer.SharedEnv.Default("POETRY_VIRTUALENVS_PATH", venvLayer.Path)
