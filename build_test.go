@@ -12,6 +12,7 @@ import (
 
 	"github.com/paketo-buildpacks/packit/v2"
 	"github.com/paketo-buildpacks/packit/v2/chronos"
+	"github.com/paketo-buildpacks/packit/v2/sbom"
 	"github.com/paketo-buildpacks/packit/v2/scribe"
 	poetryinstall "github.com/paketo-buildpacks/poetry-install"
 	"github.com/paketo-buildpacks/poetry-install/fakes"
@@ -30,13 +31,15 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		entryResolver     *fakes.EntryResolver
 		installProcess    *fakes.InstallProcess
+		sbomGenerator     *fakes.SBOMGenerator
 		pythonPathProcess *fakes.PythonPathLookupProcess
 		clock             chronos.Clock
 
 		timeStamp time.Time
 		buffer    *bytes.Buffer
 
-		build packit.BuildFunc
+		build        packit.BuildFunc
+		buildContext packit.BuildContext
 	)
 
 	it.Before(func() {
@@ -58,6 +61,9 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		entryResolver = &fakes.EntryResolver{}
 
+		sbomGenerator = &fakes.SBOMGenerator{}
+		sbomGenerator.GenerateCall.Returns.SBOM = sbom.SBOM{}
+
 		buffer = bytes.NewBuffer(nil)
 
 		timeStamp = time.Now()
@@ -69,22 +75,16 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			entryResolver,
 			installProcess,
 			pythonPathProcess,
+			sbomGenerator,
 			clock,
 			scribe.NewEmitter(buffer),
 		)
-	})
 
-	it.After(func() {
-		Expect(os.RemoveAll(layersDir)).To(Succeed())
-		Expect(os.RemoveAll(workingDir)).To(Succeed())
-		Expect(os.RemoveAll(cnbDir)).To(Succeed())
-	})
-
-	it("runs the build process and returns expected layers", func() {
-		result, err := build(packit.BuildContext{
+		buildContext = packit.BuildContext{
 			BuildpackInfo: packit.BuildpackInfo{
-				Name:    "Some Buildpack",
-				Version: "some-version",
+				Name:        "Some Buildpack",
+				Version:     "some-version",
+				SBOMFormats: []string{sbom.CycloneDXFormat, sbom.SPDXFormat},
 			},
 			WorkingDir: workingDir,
 			CNBPath:    cnbDir,
@@ -96,7 +96,17 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			Platform: packit.Platform{Path: "some-platform-path"},
 			Layers:   packit.Layers{Path: layersDir},
 			Stack:    "some-stack",
-		})
+		}
+	})
+
+	it.After(func() {
+		Expect(os.RemoveAll(layersDir)).To(Succeed())
+		Expect(os.RemoveAll(workingDir)).To(Succeed())
+		Expect(os.RemoveAll(cnbDir)).To(Succeed())
+	})
+
+	it("runs the build process and returns expected layers", func() {
+		result, err := build(buildContext)
 		Expect(err).NotTo(HaveOccurred())
 
 		layers := result.Layers
@@ -105,20 +115,35 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		venvLayer := layers[0]
 		Expect(venvLayer.Name).To(Equal("poetry-venv"))
 		Expect(venvLayer.Path).To(Equal(filepath.Join(layersDir, "poetry-venv")))
+
 		Expect(venvLayer.Build).To(BeFalse())
 		Expect(venvLayer.Launch).To(BeFalse())
 		Expect(venvLayer.Cache).To(BeFalse())
+
 		Expect(venvLayer.BuildEnv).To(BeEmpty())
 		Expect(venvLayer.LaunchEnv).To(BeEmpty())
 		Expect(venvLayer.ProcessLaunchEnv).To(BeEmpty())
+
 		Expect(venvLayer.SharedEnv).To(HaveLen(5))
 		Expect(venvLayer.SharedEnv["PATH.prepend"]).To(Equal("some-venv-dir/bin"))
 		Expect(venvLayer.SharedEnv["PATH.delim"]).To(Equal(":"))
 		Expect(venvLayer.SharedEnv["PYTHONPATH.prepend"]).To(Equal("some-python-path"))
 		Expect(venvLayer.SharedEnv["PYTHONPATH.delim"]).To(Equal(":"))
 		Expect(venvLayer.SharedEnv["POETRY_VIRTUALENVS_PATH.default"]).To(Equal(filepath.Join(layersDir, "poetry-venv")))
+
 		Expect(venvLayer.Metadata).To(Equal(map[string]interface{}{
 			"built_at": timeStamp.Format(time.RFC3339Nano),
+		}))
+
+		Expect(venvLayer.SBOM.Formats()).To(Equal([]packit.SBOMFormat{
+			{
+				Extension: sbom.Format(sbom.CycloneDXFormat).Extension(),
+				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.CycloneDXFormat),
+			},
+			{
+				Extension: sbom.Format(sbom.SPDXFormat).Extension(),
+				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.SPDXFormat),
+			},
 		}))
 
 		Expect(installProcess.ExecuteCall.Receives.WorkingDir).To(Equal(workingDir))
@@ -126,6 +151,8 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(installProcess.ExecuteCall.Receives.CacheDir).To(Equal(filepath.Join(layersDir, "cache")))
 
 		Expect(pythonPathProcess.ExecuteCall.Receives.VenvDir).To(Equal("some-venv-dir"))
+
+		Expect(sbomGenerator.GenerateCall.Receives.Dir).To(Equal(workingDir))
 
 		Expect(entryResolver.MergeLayerTypesCall.Receives.Name).To(Equal("poetry-venv"))
 		Expect(entryResolver.MergeLayerTypesCall.Receives.Entries).To(Equal([]packit.BuildpackPlanEntry{
@@ -143,22 +170,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("layer's build, launch, cache flags must be set", func() {
-			result, err := build(packit.BuildContext{
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "site-venv"},
-					},
-				},
-				Platform: packit.Platform{Path: "some-platform-path"},
-				Layers:   packit.Layers{Path: layersDir},
-				Stack:    "some-stack",
-			})
+			result, err := build(buildContext)
 			Expect(err).NotTo(HaveOccurred())
 
 			layers := result.Layers
@@ -166,6 +178,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 			venvLayer := layers[0]
 			Expect(venvLayer.Name).To(Equal("poetry-venv"))
+
 			Expect(venvLayer.Build).To(BeTrue())
 			Expect(venvLayer.Launch).To(BeTrue())
 			Expect(venvLayer.Cache).To(BeTrue())
@@ -179,22 +192,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("layer's build, cache flags must be set", func() {
-			result, err := build(packit.BuildContext{
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "site-venv"},
-					},
-				},
-				Platform: packit.Platform{Path: "some-platform-path"},
-				Layers:   packit.Layers{Path: layersDir},
-				Stack:    "some-stack",
-			})
+			result, err := build(buildContext)
 			Expect(err).NotTo(HaveOccurred())
 
 			layers := result.Layers
@@ -202,12 +200,15 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 			venvLayer := layers[0]
 			Expect(venvLayer.Name).To(Equal("poetry-venv"))
+
 			Expect(venvLayer.Build).To(BeFalse())
 			Expect(venvLayer.Launch).To(BeTrue())
 			Expect(venvLayer.Cache).To(BeTrue())
+
 			Expect(venvLayer.BuildEnv).To(BeEmpty())
 			Expect(venvLayer.LaunchEnv).To(BeEmpty())
 			Expect(venvLayer.ProcessLaunchEnv).To(BeEmpty())
+
 			Expect(venvLayer.SharedEnv).To(HaveLen(5))
 			Expect(venvLayer.SharedEnv["PATH.prepend"]).To(Equal("some-venv-dir/bin"))
 			Expect(venvLayer.SharedEnv["PATH.delim"]).To(Equal(":"))
@@ -232,22 +233,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("result should include a cache layer", func() {
-			result, err := build(packit.BuildContext{
-				BuildpackInfo: packit.BuildpackInfo{
-					Name:    "Some Buildpack",
-					Version: "some-version",
-				},
-				WorkingDir: workingDir,
-				CNBPath:    cnbDir,
-				Plan: packit.BuildpackPlan{
-					Entries: []packit.BuildpackPlanEntry{
-						{Name: "site-venv"},
-					},
-				},
-				Platform: packit.Platform{Path: "some-platform-path"},
-				Layers:   packit.Layers{Path: layersDir},
-				Stack:    "some-stack",
-			})
+			result, err := build(buildContext)
 			Expect(err).NotTo(HaveOccurred())
 
 			layers := result.Layers
@@ -255,18 +241,22 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 			venvLayer := layers[0]
 			Expect(venvLayer.Name).To(Equal("poetry-venv"))
+
 			Expect(venvLayer.Build).To(BeTrue())
 			Expect(venvLayer.Launch).To(BeTrue())
 			Expect(venvLayer.Cache).To(BeTrue())
+
 			Expect(venvLayer.BuildEnv).To(BeEmpty())
 			Expect(venvLayer.LaunchEnv).To(BeEmpty())
 			Expect(venvLayer.ProcessLaunchEnv).To(BeEmpty())
+
 			Expect(venvLayer.SharedEnv).To(HaveLen(5))
 			Expect(venvLayer.SharedEnv["PATH.prepend"]).To(Equal("some-cached-venv-dir/bin"))
 			Expect(venvLayer.SharedEnv["PATH.delim"]).To(Equal(":"))
 			Expect(venvLayer.SharedEnv["PYTHONPATH.prepend"]).To(Equal("some-python-path"))
 			Expect(venvLayer.SharedEnv["PYTHONPATH.delim"]).To(Equal(":"))
 			Expect(venvLayer.SharedEnv["POETRY_VIRTUALENVS_PATH.default"]).To(Equal(filepath.Join(layersDir, "poetry-venv")))
+
 			Expect(venvLayer.Metadata).To(Equal(map[string]interface{}{
 				"built_at": timeStamp.Format(time.RFC3339Nano),
 			}))
@@ -296,23 +286,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name: "site-venv",
-							},
-						},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError(ContainSubstring("permission denied")))
 			})
 		})
@@ -323,23 +297,7 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name: "poetry-venv",
-							},
-						},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError("could not run install process"))
 			})
 		})
@@ -350,24 +308,30 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			})
 
 			it("returns an error", func() {
-				_, err := build(packit.BuildContext{
-					WorkingDir: workingDir,
-					CNBPath:    cnbDir,
-					Stack:      "some-stack",
-					BuildpackInfo: packit.BuildpackInfo{
-						Name:    "Some Buildpack",
-						Version: "some-version",
-					},
-					Plan: packit.BuildpackPlan{
-						Entries: []packit.BuildpackPlanEntry{
-							{
-								Name: "poetry-venv",
-							},
-						},
-					},
-					Layers: packit.Layers{Path: layersDir},
-				})
+				_, err := build(buildContext)
 				Expect(err).To(MatchError("could not run Python path process"))
+			})
+		})
+
+		context("when generating the SBOM returns an error", func() {
+			it.Before(func() {
+				buildContext.BuildpackInfo.SBOMFormats = []string{"random-format"}
+			})
+
+			it("returns an error", func() {
+				_, err := build(buildContext)
+				Expect(err).To(MatchError(`unsupported SBOM format: 'random-format'`))
+			})
+		})
+
+		context("when formatting the SBOM returns an error", func() {
+			it.Before(func() {
+				sbomGenerator.GenerateCall.Returns.Error = errors.New("failed to generate SBOM")
+			})
+
+			it("returns an error", func() {
+				_, err := build(buildContext)
+				Expect(err).To(MatchError(ContainSubstring("failed to generate SBOM")))
 			})
 		})
 	})

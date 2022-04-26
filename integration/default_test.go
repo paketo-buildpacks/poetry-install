@@ -2,8 +2,6 @@ package integration_test
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,16 +93,75 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(container).Should(BeAvailable())
+			Eventually(container).Should(Serve(ContainSubstring("Hello, World!")).OnPort(8080))
+		})
 
-			response, err := http.Get(fmt.Sprintf("http://localhost:%s", container.HostPort("8080")))
-			Expect(err).NotTo(HaveOccurred())
-			defer response.Body.Close()
+		context("validating SBOM", func() {
+			var (
+				sbomDir string
+			)
 
-			Expect(response.StatusCode).To(Equal(http.StatusOK))
+			it.Before(func() {
+				var err error
+				sbomDir, err = os.MkdirTemp("", "sbom")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(os.Chmod(sbomDir, os.ModePerm)).To(Succeed())
+			})
 
-			content, err := ioutil.ReadAll(response.Body)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(string(content)).To(ContainSubstring("Hello, World!"))
+			it.After(func() {
+				Expect(os.RemoveAll(sbomDir)).To(Succeed())
+			})
+
+			it("writes SBOM files to the layer and label metadata", func() {
+				var err error
+				var logs fmt.Stringer
+				image, logs, err = pack.WithNoColor().Build.
+					WithPullPolicy("never").
+					WithBuildpacks(
+						settings.Buildpacks.CPython.Online,
+						settings.Buildpacks.Pip.Online,
+						settings.Buildpacks.Poetry.Online,
+						settings.Buildpacks.PoetryInstall.Online,
+						settings.Buildpacks.BuildPlan.Online,
+					).
+					WithEnv(map[string]string{
+						"BP_LOG_LEVEL": "DEBUG",
+					}).
+					WithSBOMOutputDir(sbomDir).
+					Execute(name, filepath.Join("testdata", "default_app"))
+				Expect(err).ToNot(HaveOccurred(), logs.String)
+
+				container, err = docker.Container.Run.
+					WithCommand("gunicorn server:app").
+					WithEnv(map[string]string{"PORT": "8080"}).
+					WithPublish("8080").
+					Execute(image.ID)
+				Expect(err).ToNot(HaveOccurred())
+
+				Eventually(container).Should(BeAvailable())
+				Eventually(container).Should(Serve(ContainSubstring("Hello, World!")).OnPort(8080))
+
+				Expect(logs).To(ContainLines(
+					fmt.Sprintf("  Generating SBOM for /layers/%s/poetry-venv", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
+					MatchRegexp(`      Completed in \d+(\.?\d+)*`),
+				))
+				Expect(logs).To(ContainLines(
+					"  Writing SBOM in the following format(s):",
+					"    application/vnd.cyclonedx+json",
+					"    application/spdx+json",
+					"    application/vnd.syft+json",
+				))
+
+				// check that all required SBOM files are present
+				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.cdx.json")).To(BeARegularFile())
+				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.spdx.json")).To(BeARegularFile())
+				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.syft.json")).To(BeARegularFile())
+
+				// check an SBOM file to make sure it has an entry for a poetry dependency
+				contents, err := os.ReadFile(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.cdx.json"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(string(contents)).To(ContainSubstring(`"name": "flask"`))
+			})
 		})
 	})
 }
