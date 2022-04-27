@@ -70,10 +70,6 @@ func Build(entryResolver EntryResolver, installProcess InstallProcess, pythonPat
 		logger.Action("Completed in %s", duration.Round(time.Millisecond))
 		logger.Break()
 
-		venvLayer.Metadata = map[string]interface{}{
-			"built_at": clock.Now().Format(time.RFC3339Nano),
-		}
-
 		pythonPathDir, err := pythonPathProcess.Execute(venvDir)
 		if err != nil {
 			return packit.BuildResult{}, err
