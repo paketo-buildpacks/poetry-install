@@ -30,7 +30,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		entryResolver     *fakes.EntryResolver
 		installProcess    *fakes.InstallProcess
-		sbomGenerator     *fakes.SBOMGenerator
 		pythonPathProcess *fakes.PythonPathLookupProcess
 
 		buffer *bytes.Buffer
@@ -58,16 +57,12 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 
 		entryResolver = &fakes.EntryResolver{}
 
-		sbomGenerator = &fakes.SBOMGenerator{}
-		sbomGenerator.GenerateCall.Returns.SBOM = sbom.SBOM{}
-
 		buffer = bytes.NewBuffer(nil)
 
 		build = poetryinstall.Build(
 			entryResolver,
 			installProcess,
 			pythonPathProcess,
-			sbomGenerator,
 			chronos.DefaultClock,
 			scribe.NewEmitter(buffer),
 		)
@@ -123,14 +118,17 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(venvLayer.SharedEnv["PYTHONPATH.delim"]).To(Equal(":"))
 		Expect(venvLayer.SharedEnv["POETRY_VIRTUALENVS_PATH.default"]).To(Equal(filepath.Join(layersDir, "poetry-venv")))
 
+		expectedSbom, err := sbom.Generate(workingDir)
+		Expect(err).NotTo(HaveOccurred())
+
 		Expect(venvLayer.SBOM.Formats()).To(Equal([]packit.SBOMFormat{
 			{
 				Extension: sbom.Format(sbom.CycloneDXFormat).Extension(),
-				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.CycloneDXFormat),
+				Content:   sbom.NewFormattedReader(expectedSbom, sbom.CycloneDXFormat),
 			},
 			{
 				Extension: sbom.Format(sbom.SPDXFormat).Extension(),
-				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.SPDXFormat),
+				Content:   sbom.NewFormattedReader(expectedSbom, sbom.SPDXFormat),
 			},
 		}))
 
@@ -139,8 +137,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(installProcess.ExecuteCall.Receives.CacheDir).To(Equal(filepath.Join(layersDir, "cache")))
 
 		Expect(pythonPathProcess.ExecuteCall.Receives.VenvDir).To(Equal("some-venv-dir"))
-
-		Expect(sbomGenerator.GenerateCall.Receives.Dir).To(Equal(workingDir))
 
 		Expect(entryResolver.MergeLayerTypesCall.Receives.Name).To(Equal("poetry-venv"))
 		Expect(entryResolver.MergeLayerTypesCall.Receives.Entries).To(Equal([]packit.BuildpackPlanEntry{
@@ -305,17 +301,6 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 			it("returns an error", func() {
 				_, err := build(buildContext)
 				Expect(err).To(MatchError(`unsupported SBOM format: 'random-format'`))
-			})
-		})
-
-		context("when formatting the SBOM returns an error", func() {
-			it.Before(func() {
-				sbomGenerator.GenerateCall.Returns.Error = errors.New("failed to generate SBOM")
-			})
-
-			it("returns an error", func() {
-				_, err := build(buildContext)
-				Expect(err).To(MatchError(ContainSubstring("failed to generate SBOM")))
 			})
 		})
 	})

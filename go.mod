@@ -2,6 +2,8 @@ module github.com/paketo-buildpacks/poetry-install
 
 go 1.16
 
+replace github.com/paketo-buildpacks/packit/v2 => /Users/caseyj/git/paketo-buildpacks/packit/
+
 require (
 	github.com/BurntSushi/toml v1.1.0
 	github.com/onsi/gomega v1.19.0
