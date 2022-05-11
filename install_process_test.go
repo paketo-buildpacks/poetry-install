@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -34,13 +33,13 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 	it.Before(func() {
 		var err error
-		packagesLayerPath, err = ioutil.TempDir("", "packages")
+		packagesLayerPath, err = os.MkdirTemp("", "packages")
 		Expect(err).NotTo(HaveOccurred())
 
-		cacheLayerPath, err = ioutil.TempDir("", "cache")
+		cacheLayerPath, err = os.MkdirTemp("", "cache")
 		Expect(err).NotTo(HaveOccurred())
 
-		workingDir, err = ioutil.TempDir("", "workingdir")
+		workingDir, err = os.MkdirTemp("", "workingdir")
 		Expect(err).NotTo(HaveOccurred())
 
 		executable = &fakes.Executable{}
