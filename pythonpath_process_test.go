@@ -2,7 +2,6 @@ package poetryinstall_test
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,7 +23,7 @@ func testPythonPathProcess(t *testing.T, context spec.G, it spec.S) {
 
 	it.Before(func() {
 		var err error
-		venvDir, err = ioutil.TempDir("", "poetry-venv")
+		venvDir, err = os.MkdirTemp("", "poetry-venv")
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(os.MkdirAll(filepath.Join(venvDir, "lib", "python3.8", "site-packages"), os.ModePerm)).To(Succeed())
