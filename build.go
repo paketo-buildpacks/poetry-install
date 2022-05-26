@@ -99,12 +99,11 @@ func Build(entryResolver EntryResolver, installProcess InstallProcess, pythonPat
 			return packit.BuildResult{}, err
 		}
 
-		logger.Process("Configuring environment")
 		venvLayer.SharedEnv.Default("POETRY_VIRTUALENVS_PATH", venvLayer.Path)
 		venvLayer.SharedEnv.Prepend("PYTHONPATH", pythonPathDir, string(os.PathListSeparator))
 		venvLayer.SharedEnv.Prepend("PATH", filepath.Join(venvDir, "bin"), string(os.PathListSeparator))
-		logger.Subprocess("%s", scribe.NewFormattedMapFromEnvironment(venvLayer.SharedEnv))
-		logger.Break()
+
+		logger.EnvironmentVariables(venvLayer)
 
 		layers := []packit.Layer{venvLayer}
 		if _, err := os.Stat(cacheLayer.Path); err == nil {
