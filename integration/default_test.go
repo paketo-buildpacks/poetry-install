@@ -79,7 +79,12 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 				MatchRegexp(`      Completed in \d+\.\d+`),
 			))
 			Expect(logs).To(ContainLines(
-				"  Configuring environment",
+				"  Configuring build environment",
+				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				"",
+				"  Configuring launch environment",
 				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
 				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
 				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
