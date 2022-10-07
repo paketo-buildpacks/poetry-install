@@ -24,7 +24,7 @@ require (
 	github.com/onsi/gomega v1.21.1
 	github.com/opencontainers/image-spec v1.1.0-rc1 // indirect
 	github.com/opencontainers/runc v1.1.4 // indirect
-	github.com/paketo-buildpacks/occam v0.13.2
+	github.com/paketo-buildpacks/occam v0.13.3
 	github.com/paketo-buildpacks/packit/v2 v2.6.1
 	github.com/pierrec/lz4/v4 v4.1.17 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20220927061507-ef77025ab5aa // indirect
@@ -38,7 +38,6 @@ require (
 	github.com/vifraa/gopom v0.2.0 // indirect
 	github.com/wagoodman/go-progress v0.0.0-20220614130704-4b1c25a33c7c // indirect
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be // indirect
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b // indirect
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0 // indirect
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
