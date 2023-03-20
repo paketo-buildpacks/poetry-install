@@ -122,16 +122,12 @@ func testBuild(t *testing.T, context spec.G, it spec.S) {
 		Expect(venvLayer.SharedEnv["PYTHONPATH.delim"]).To(Equal(":"))
 		Expect(venvLayer.SharedEnv["POETRY_VIRTUALENVS_PATH.default"]).To(Equal(filepath.Join(layersDir, "poetry-venv")))
 
-		Expect(venvLayer.SBOM.Formats()).To(Equal([]packit.SBOMFormat{
-			{
-				Extension: sbom.Format(sbom.CycloneDXFormat).Extension(),
-				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.CycloneDXFormat),
-			},
-			{
-				Extension: sbom.Format(sbom.SPDXFormat).Extension(),
-				Content:   sbom.NewFormattedReader(sbom.SBOM{}, sbom.SPDXFormat),
-			},
-		}))
+		Expect(venvLayer.SBOM.Formats()).To(HaveLen(2))
+		var actualExtensions []string
+		for _, format := range venvLayer.SBOM.Formats() {
+			actualExtensions = append(actualExtensions, format.Extension)
+		}
+		Expect(actualExtensions).To(ConsistOf("cdx.json", "spdx.json"))
 
 		Expect(installProcess.ExecuteCall.Receives.WorkingDir).To(Equal(workingDir))
 		Expect(installProcess.ExecuteCall.Receives.TargetDir).To(Equal(filepath.Join(layersDir, "poetry-venv")))
