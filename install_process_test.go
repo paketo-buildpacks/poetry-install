@@ -15,6 +15,7 @@ import (
 
 	. "github.com/onsi/gomega"
 	. "github.com/onsi/gomega/gstruct"
+	. "github.com/paketo-buildpacks/occam/matchers"
 )
 
 func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
@@ -25,6 +26,7 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 		cacheLayerPath    string
 		workingDir        string
 		executable        *fakes.Executable
+		buffer            *bytes.Buffer
 
 		executableInvocations []pexec.Execution
 
@@ -50,12 +52,14 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 			executableInvocations = append(executableInvocations, execution)
 			// Various path constructs (like .. and // and whitespace) to validate that we are cleaning the absolute filepath
 			// when required
-			_, err := execution.Stdout.Write([]byte("\t//some/path/xyz/../to/some/venv//\n\n"))
+			fmt.Fprintln(execution.Stdout, "//some/path/xyz/../to/some/venv//")
+			fmt.Fprintln(execution.Stderr, "stderr output")
 			Expect(err).NotTo(HaveOccurred())
 			return nil
 		}
+		buffer = bytes.NewBuffer(nil)
 
-		poetryInstallProcess = poetryinstall.NewPoetryInstallProcess(executable, scribe.NewEmitter(bytes.NewBuffer(nil)))
+		poetryInstallProcess = poetryinstall.NewPoetryInstallProcess(executable, scribe.NewEmitter(buffer))
 	})
 
 	it.After(func() {
@@ -95,6 +99,11 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 			}))
 
 			Expect(venvDir).To(Equal("/some/path/to/some/venv"))
+			Expect(buffer.String()).To(ContainLines(
+				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install'", cacheLayerPath, packagesLayerPath),
+				"      //some/path/xyz/../to/some/venv//",
+				"      stderr output",
+			))
 		})
 
 		context("failure cases", func() {
@@ -106,7 +115,7 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 				it("returns an error", func() {
 					_, err := poetryInstallProcess.Execute(workingDir, packagesLayerPath, cacheLayerPath)
-					Expect(err).To(MatchError("poetry install failed:\n\nerror: could not run executable"))
+					Expect(err).To(MatchError("poetry install failed:\nerror: could not run executable"))
 				})
 			})
 		})
