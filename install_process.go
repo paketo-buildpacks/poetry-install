@@ -45,16 +45,15 @@ func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) 
 
 	p.logger.Subprocess(fmt.Sprintf("Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry %s'", cachePath, targetPath, strings.Join(args, " ")))
 
-	buffer := bytes.NewBuffer(nil)
 	err := p.executable.Execute(pexec.Execution{
 		Args:   args,
 		Env:    env,
 		Dir:    workingDir,
-		Stdout: buffer,
-		Stderr: buffer,
+		Stdout: p.logger.ActionWriter,
+		Stderr: p.logger.ActionWriter,
 	})
 	if err != nil {
-		return "", fmt.Errorf("poetry install failed:\n%s\nerror: %w", buffer, err)
+		return "", fmt.Errorf("poetry install failed:\nerror: %w", err)
 	}
 
 	return p.findVenvDir(workingDir, targetPath, cachePath)

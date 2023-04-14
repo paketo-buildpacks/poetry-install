@@ -76,8 +76,8 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 				)),
-				MatchRegexp(`      Completed in \d+\.\d+`),
 			))
+			Expect(logs).To(ContainLines(MatchRegexp(`      Completed in \d+\.\d+`)))
 			Expect(logs).To(ContainLines(
 				"  Configuring build environment",
 				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
