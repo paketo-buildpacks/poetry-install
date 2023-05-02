@@ -67,7 +67,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 				_, err := detect(packit.DetectContext{
 					WorkingDir: workingDir,
 				})
-				Expect(err).To(MatchError(packit.Fail))
+				Expect(err).To(MatchError(packit.Fail.WithMessage("no 'pyproject.toml' found")))
 			})
 		})
 
