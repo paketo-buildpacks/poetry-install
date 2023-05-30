@@ -5,7 +5,7 @@ go 1.19
 // This is required because of a breaking change in a newer version
 
 require (
-	github.com/BurntSushi/toml v1.2.1
+	github.com/BurntSushi/toml v1.3.0
 	github.com/onsi/gomega v1.27.7
 	github.com/paketo-buildpacks/occam v0.15.1
 	github.com/paketo-buildpacks/packit/v2 v2.11.0
