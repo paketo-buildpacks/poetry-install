@@ -19,6 +19,11 @@ The buildpack will do the following:
     environment variable `POETRY_VIRTUAL_ENVS_PATH`.
   - Prepends the layer `poetry-venv` onto `PYTHONPATH`.
   - Prepends the `bin` directory of the `poetry-venv` layer to the `PATH` environment variable.
+  - Installs only dependencies defined in the main group,
+  - Installs dependencies from the main group with dependencies listed via the
+    environment variable `BP_POETRY_INSTALL_WITH`, following `--with` option behavior of the [`poetry install` command](https://python-poetry.org/docs/cli/#install)
+    - eg, `BP_POETRY_INSTALL_WITH=dev` will install dependencies from main and dev groups
+    - eg, `BP_POETRY_INSTALL_WITH=dev,docs` will install dependencies from main, dev and docs groups
 * At run time:
   - Does nothing
 
