@@ -36,6 +36,11 @@ func NewPoetryInstallProcess(executable Executable, logger scribe.Emitter) Poetr
 // a virtual env in the targetPath.
 func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) (string, error) {
 	args := []string{"install"}
+	if group, exists := os.LookupEnv("BP_POETRY_INSTALL_WITH"); exists && len(group) > 0 {
+		args = append(args, "--with", group)
+	} else {
+		args = append(args, "--with", "main")
+	}
 
 	env := append(
 		os.Environ(),

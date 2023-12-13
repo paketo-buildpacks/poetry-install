@@ -14,7 +14,7 @@ import (
 	. "github.com/paketo-buildpacks/occam/matchers"
 )
 
-func testDefault(t *testing.T, context spec.G, it spec.S) {
+func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 	var (
 		Expect     = NewWithT(t).Expect
 		Eventually = NewWithT(t).Eventually
@@ -41,7 +41,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			name, err = occam.RandomName()
 			Expect(err).NotTo(HaveOccurred())
 
-			source, err = occam.Source(filepath.Join("testdata", "default_app"))
+			source, err = occam.Source(filepath.Join("testdata", "app_with_dependency_group"))
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -52,7 +52,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			Expect(os.RemoveAll(source)).To(Succeed())
 		})
 
-		it("builds and runs successfully", func() {
+		it("builds and runs successfully with dev dependency group", func() {
 			var err error
 			var logs fmt.Stringer
 
@@ -65,6 +65,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 					settings.Buildpacks.PoetryInstall.Online,
 					settings.Buildpacks.BuildPlan.Online,
 				).
+				WithEnv(map[string]string{"BP_POETRY_INSTALL_WITH": "dev"}).
 				Execute(name, source)
 			Expect(err).ToNot(HaveOccurred(), logs.String)
 
@@ -72,7 +73,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 				MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, buildpackInfo.Buildpack.Name)),
 				"  Executing build process",
 				MatchRegexp(fmt.Sprintf(
-					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install --with main'",
+					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install --with dev'",
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 				)),
@@ -81,7 +82,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			aDependencyFromMainGroup := "Installing flask"
 			aDependencyFromDevGroup := "Installing pytest"
 			Expect(logs).To(ContainSubstring(aDependencyFromMainGroup))
-			Expect(logs).NotTo(ContainSubstring(aDependencyFromDevGroup))
+			Expect(logs).To(ContainSubstring(aDependencyFromDevGroup))
 
 			Expect(logs).To(ContainLines(MatchRegexp(`      Completed in \d+\.\d+`)))
 			Expect(logs).To(ContainLines(
