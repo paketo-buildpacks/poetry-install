@@ -172,6 +172,8 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 				contents, err := os.ReadFile(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.cdx.json"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(contents)).To(ContainSubstring(`"name": "flask"`))
+				// optional dev dependencies should not be included
+				Expect(string(contents)).NotTo(ContainSubstring(`"name": "pytest"`))
 			})
 		})
 	})

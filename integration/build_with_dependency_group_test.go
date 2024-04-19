@@ -55,6 +55,7 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 		it("builds and runs successfully with dev dependency group", func() {
 			var err error
 			var logs fmt.Stringer
+			buildPackIdUnderscore := strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")
 
 			image, logs, err = pack.WithNoColor().Build.
 				WithPullPolicy("never").
@@ -74,8 +75,8 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 				"  Executing build process",
 				MatchRegexp(fmt.Sprintf(
 					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install --with dev'",
-					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
-					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
+					buildPackIdUnderscore,
+					buildPackIdUnderscore,
 				)),
 			))
 
@@ -85,16 +86,18 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 			Expect(logs).To(ContainSubstring(aDependencyFromDevGroup))
 
 			Expect(logs).To(ContainLines(MatchRegexp(`      Completed in \d+\.\d+`)))
+
 			Expect(logs).To(ContainLines(
 				"  Configuring build environment",
-				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				"",
+				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, buildPackIdUnderscore)),
+				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, buildPackIdUnderscore)),
+				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, buildPackIdUnderscore)),
+			))
+			Expect(logs).To(ContainLines(
 				"  Configuring launch environment",
-				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
-				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, buildPackIdUnderscore)),
+				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, buildPackIdUnderscore)),
+				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, buildPackIdUnderscore)),
 			))
 
 			container, err = docker.Container.Run.
@@ -127,6 +130,8 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 			it("writes SBOM files to the layer and label metadata", func() {
 				var err error
 				var logs fmt.Stringer
+				buildPackIdUnderscore := strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")
+
 				image, logs, err = pack.WithNoColor().Build.
 					WithPullPolicy("never").
 					WithBuildpacks(
@@ -137,7 +142,8 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 						settings.Buildpacks.BuildPlan.Online,
 					).
 					WithEnv(map[string]string{
-						"BP_LOG_LEVEL": "DEBUG",
+						"BP_LOG_LEVEL":           "DEBUG",
+						"BP_POETRY_INSTALL_WITH": "dev",
 					}).
 					WithSBOMOutputDir(sbomDir).
 					Execute(name, source)
@@ -154,7 +160,7 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 				Eventually(container).Should(Serve(ContainSubstring("Hello, World!")).OnPort(8080))
 
 				Expect(logs).To(ContainLines(
-					fmt.Sprintf("  Generating SBOM for /layers/%s/poetry-venv", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_")),
+					fmt.Sprintf("  Generating SBOM for /layers/%s/poetry-venv", buildPackIdUnderscore),
 					MatchRegexp(`      Completed in \d+(\.?\d+)*`),
 				))
 				Expect(logs).To(ContainLines(
@@ -165,14 +171,16 @@ func testWithDependencyGroup(t *testing.T, context spec.G, it spec.S) {
 				))
 
 				// check that all required SBOM files are present
-				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.cdx.json")).To(BeARegularFile())
-				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.spdx.json")).To(BeARegularFile())
-				Expect(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.syft.json")).To(BeARegularFile())
+				Expect(filepath.Join(sbomDir, "sbom", "launch", buildPackIdUnderscore, "poetry-venv", "sbom.cdx.json")).To(BeARegularFile())
+				Expect(filepath.Join(sbomDir, "sbom", "launch", buildPackIdUnderscore, "poetry-venv", "sbom.spdx.json")).To(BeARegularFile())
+				Expect(filepath.Join(sbomDir, "sbom", "launch", buildPackIdUnderscore, "poetry-venv", "sbom.syft.json")).To(BeARegularFile())
 
 				// check an SBOM file to make sure it has an entry for a poetry dependency
-				contents, err := os.ReadFile(filepath.Join(sbomDir, "sbom", "launch", strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"), "poetry-venv", "sbom.cdx.json"))
+				contents, err := os.ReadFile(filepath.Join(sbomDir, "sbom", "launch", buildPackIdUnderscore, "poetry-venv", "sbom.cdx.json"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(string(contents)).To(ContainSubstring(`"name": "flask"`))
+				// optional dev dependencies should be included
+				Expect(string(contents)).To(ContainSubstring(`"name": "pytest"`))
 			})
 		})
 	})
