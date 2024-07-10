@@ -69,7 +69,10 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 	})
 
 	context("Execute", func() {
-		it("runs installation", func() {
+		it("runs installation for main dependencies group when BP_POETRY_INSTALL_WITH is not set", func() {
+			dependencyGroups := os.Getenv("BP_POETRY_INSTALL_WITH")
+			Expect(dependencyGroups).To(BeEmpty())
+
 			venvDir, err := poetryInstallProcess.Execute(workingDir, packagesLayerPath, cacheLayerPath)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -78,7 +81,7 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(executableInvocations[0]).To(MatchFields(IgnoreExtras, Fields{
 				"Args": Equal([]string{
-					"install",
+					"install", "--with", "main",
 				}),
 				"Dir": Equal(workingDir),
 				"Env": ContainElements([]string{
@@ -100,7 +103,89 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(venvDir).To(Equal("/some/path/to/some/venv"))
 			Expect(buffer.String()).To(ContainLines(
-				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install'", cacheLayerPath, packagesLayerPath),
+				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install --with main'", cacheLayerPath, packagesLayerPath),
+				"      //some/path/xyz/../to/some/venv//",
+				"      stderr output",
+			))
+		})
+
+		it("runs installation for main dependencies group when BP_POETRY_INSTALL_WITH is empty", func() {
+			t.Setenv("BP_POETRY_INSTALL_WITH", "")
+			dependencyGroups := os.Getenv("BP_POETRY_INSTALL_WITH")
+			Expect(dependencyGroups).To(BeEmpty())
+
+			venvDir, err := poetryInstallProcess.Execute(workingDir, packagesLayerPath, cacheLayerPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(executable.ExecuteCall.CallCount).To(Equal(2))
+			Expect(executableInvocations).To(HaveLen(2))
+
+			Expect(executableInvocations[0]).To(MatchFields(IgnoreExtras, Fields{
+				"Args": Equal([]string{
+					"install", "--with", "main",
+				}),
+				"Dir": Equal(workingDir),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+				}),
+			}))
+
+			Expect(executableInvocations[1]).To(MatchFields(IgnoreExtras, Fields{
+				"Args": Equal([]string{
+					"env", "info", "--path",
+				}),
+				"Dir": Equal(workingDir),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+				}),
+			}))
+
+			Expect(venvDir).To(Equal("/some/path/to/some/venv"))
+			Expect(buffer.String()).To(ContainLines(
+				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install --with main'", cacheLayerPath, packagesLayerPath),
+				"      //some/path/xyz/../to/some/venv//",
+				"      stderr output",
+			))
+		})
+
+		it("runs installation with dev dependencies group when BP_POETRY_INSTALL_WITH=dev", func() {
+			devGroup := "dev"
+			t.Setenv("BP_POETRY_INSTALL_WITH", devGroup)
+			venvDir, err := poetryInstallProcess.Execute(workingDir, packagesLayerPath, cacheLayerPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(executable.ExecuteCall.CallCount).To(Equal(2))
+			Expect(executableInvocations).To(HaveLen(2))
+
+			Expect(executableInvocations[0]).To(MatchFields(IgnoreExtras, Fields{
+				"Args": Equal([]string{
+					"install", "--with", devGroup,
+				}),
+				"Dir": Equal(workingDir),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+					fmt.Sprintf("BP_POETRY_INSTALL_WITH=%s", devGroup),
+				}),
+			}))
+
+			Expect(executableInvocations[1]).To(MatchFields(IgnoreExtras, Fields{
+				"Args": Equal([]string{
+					"env", "info", "--path",
+				}),
+				"Dir": Equal(workingDir),
+				"Env": ContainElements([]string{
+					fmt.Sprintf("POETRY_VIRTUALENVS_PATH=%s", packagesLayerPath),
+					fmt.Sprintf("POETRY_CACHE_DIR=%s", cacheLayerPath),
+					fmt.Sprintf("BP_POETRY_INSTALL_WITH=%s", devGroup),
+				}),
+			}))
+
+			Expect(venvDir).To(Equal("/some/path/to/some/venv"))
+			Expect(buffer.String()).To(ContainLines(
+				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install --with dev'", cacheLayerPath, packagesLayerPath),
 				"      //some/path/xyz/../to/some/venv//",
 				"      stderr output",
 			))
