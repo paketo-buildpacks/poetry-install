@@ -22,6 +22,11 @@ The buildpack will do the following:
 * At run time:
   - Does nothing
 
+## Configuration
+| Environment Variable | Description                                                                                                                                                                          |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `$BP_POETRY_INSTALL_ONLY` | Configure which groups from `pyproject.toml` file will be installed, default is `main`. |
+
 ## Integration
 
 The Poetry Install CNB provides `poetry-venv` as a dependency. Downstream
