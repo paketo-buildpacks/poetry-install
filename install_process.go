@@ -35,7 +35,12 @@ func NewPoetryInstallProcess(executable Executable, logger scribe.Emitter) Poetr
 // Execute installs the poetry dependencies from workingDir/pyproject.toml into
 // a virtual env in the targetPath.
 func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) (string, error) {
-	args := []string{"install"}
+	installOnly, exists := os.LookupEnv("BP_POETRY_INSTALL_ONLY")
+	if !exists {
+		installOnly = "main"
+	}
+
+	args := []string{"install", "--only", installOnly}
 
 	env := append(
 		os.Environ(),
