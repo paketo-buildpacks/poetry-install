@@ -70,12 +70,80 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(logs).To(ContainLines(
 				MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, buildpackInfo.Buildpack.Name)),
-				"  Executing build process",
+			))
+			Expect(logs).To(ContainLines("  Executing build process"))
+			Expect(logs).To(ContainLines(
 				MatchRegexp(fmt.Sprintf(
-					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install'",
+					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install --only main'",
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
 				)),
+			))
+			Expect(logs).ToNot(ContainLines(
+				MatchRegexp(`    \- Installing ipython \(\d+\.\d+\.\d+\)`),
+			))
+			Expect(logs).ToNot(ContainLines(
+				MatchRegexp(`    \- Installing ruff \(\d+\.\d+\.\d+\)`),
+			))
+			Expect(logs).To(ContainLines(MatchRegexp(`      Completed in \d+\.\d+`)))
+			Expect(logs).To(ContainLines(
+				"  Configuring build environment",
+				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				"",
+				"  Configuring launch environment",
+				MatchRegexp(fmt.Sprintf(`    PATH                    -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/bin:\$PATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    POETRY_VIRTUALENVS_PATH -> "/layers/%s/poetry-venv"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+				MatchRegexp(fmt.Sprintf(`    PYTHONPATH              -> "/layers/%s/poetry-venv/default-app-.*-py\d+\.\d+/lib/python\d+\.\d+/site-packages:\$PYTHONPATH"`, strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"))),
+			))
+
+			container, err = docker.Container.Run.
+				WithCommand("gunicorn server:app").
+				WithEnv(map[string]string{"PORT": "8080"}).
+				WithPublish("8080").
+				Execute(image.ID)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(container).Should(BeAvailable())
+			Eventually(container).Should(Serve(ContainSubstring("Hello, World!")).OnPort(8080))
+		})
+
+		it("builds and runs successfully with develop dependencies", func() {
+			var err error
+			var logs fmt.Stringer
+
+			image, logs, err = pack.WithNoColor().Build.
+				WithPullPolicy("never").
+				WithEnv(map[string]string{
+					"BP_POETRY_INSTALL_ONLY": "main,dev",
+				}).
+				WithBuildpacks(
+					settings.Buildpacks.CPython.Online,
+					settings.Buildpacks.Pip.Online,
+					settings.Buildpacks.Poetry.Online,
+					settings.Buildpacks.PoetryInstall.Online,
+					settings.Buildpacks.BuildPlan.Online,
+				).
+				Execute(name, source)
+			Expect(err).ToNot(HaveOccurred(), logs.String)
+
+			Expect(logs).To(ContainLines(
+				MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, buildpackInfo.Buildpack.Name)),
+			))
+			Expect(logs).To(ContainLines("  Executing build process"))
+			Expect(logs).To(ContainLines(
+				MatchRegexp(fmt.Sprintf(
+					"    Running 'POETRY_CACHE_DIR=/layers/%s/cache POETRY_VIRTUALENVS_PATH=/layers/%s/poetry-venv poetry install --only main,dev'",
+					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
+					strings.ReplaceAll(buildpackInfo.Buildpack.ID, "/", "_"),
+				)),
+			))
+			Expect(logs).To(ContainLines(
+				MatchRegexp(`    \- Installing ipython \(\d+\.\d+\.\d+\)`),
+			))
+			Expect(logs).ToNot(ContainLines(
+				MatchRegexp(`    \- Installing ruff \(\d+\.\d+\.\d+\)`),
 			))
 			Expect(logs).To(ContainLines(MatchRegexp(`      Completed in \d+\.\d+`)))
 			Expect(logs).To(ContainLines(

@@ -78,7 +78,7 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(executableInvocations[0]).To(MatchFields(IgnoreExtras, Fields{
 				"Args": Equal([]string{
-					"install",
+					"install", "--only", "main",
 				}),
 				"Dir": Equal(workingDir),
 				"Env": ContainElements([]string{
@@ -100,7 +100,7 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(venvDir).To(Equal("/some/path/to/some/venv"))
 			Expect(buffer.String()).To(ContainLines(
-				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install'", cacheLayerPath, packagesLayerPath),
+				fmt.Sprintf("    Running 'POETRY_CACHE_DIR=%s POETRY_VIRTUALENVS_PATH=%s poetry install --only main'", cacheLayerPath, packagesLayerPath),
 				"      //some/path/xyz/../to/some/venv//",
 				"      stderr output",
 			))
