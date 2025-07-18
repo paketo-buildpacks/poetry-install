@@ -1,5 +1,6 @@
 !integration/testdata
 .bin
+bin/
 build
 .idea/
 linux
