@@ -39,8 +39,17 @@ func (p PoetryInstallProcess) Execute(workingDir, targetPath, cachePath string) 
 	if !exists {
 		installOnly = "main"
 	}
+	poetryVersion, exists := os.LookupEnv("BP_POETRY_VERSION")
+	if !exists {
+		poetryVersion = "2.*"
+	}
+	installCmd := []string{"sync"}
+	// Can be remove once support for poetry v1 is removed
+	if strings.HasPrefix(poetryVersion, "1") {
+		installCmd = []string{"install", "--sync"}
+	}
 
-	args := []string{"install", "--only", installOnly}
+	args := append(installCmd, "--only", installOnly)
 
 	env := append(
 		os.Environ(),
