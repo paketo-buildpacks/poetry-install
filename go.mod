@@ -1,6 +1,6 @@
 module github.com/paketo-buildpacks/poetry-install
 
-go 1.24.6
+go 1.25.0
 
 // This is required because of a breaking change in a newer version
 
