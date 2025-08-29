@@ -1,12 +1,10 @@
 # Poetry Install Cloud Native Buildpack
-## `gcr.io/paketo-buildpacks/poetry-install`
 
 The Paketo Buildpack for Poetry Install is a Cloud Native Buildpack that installs
 packages using [Poetry](https://python-poetry.org/) and makes the installed packages
 available to the application.
 
-The buildpack is published for consumption at
-`gcr.io/paketo-buildpacks/poetry-install` and `paketobuildpacks/poetry-install`.
+The buildpack is published for consumption at `paketobuildpacks/poetry-install`.
 
 ## Behavior
 This buildpack participates if `pyproject.toml` exists at the root the app.
