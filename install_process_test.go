@@ -52,8 +52,9 @@ func testInstallProcess(t *testing.T, context spec.G, it spec.S) {
 			executableInvocations = append(executableInvocations, execution)
 			// Various path constructs (like .. and // and whitespace) to validate that we are cleaning the absolute filepath
 			// when required
-			fmt.Fprintln(execution.Stdout, "//some/path/xyz/../to/some/venv//")
-			fmt.Fprintln(execution.Stderr, "stderr output")
+			_, err := fmt.Fprintln(execution.Stdout, "//some/path/xyz/../to/some/venv//")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = fmt.Fprintln(execution.Stderr, "stderr output")
 			Expect(err).NotTo(HaveOccurred())
 			return nil
 		}
